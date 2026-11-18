@@ -1,0 +1,249 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidLevel(level) {
+      return level in ['Principiante', 'Intermedio', 'Avanzado'];
+    }
+
+    function isValidStringList(arr, maxLen) {
+      return arr is list
+        && arr.size() <= maxLen
+        && (arr.size() == 0 || (arr[0] is string && arr[0].size() <= 160));
+    }
+
+    function isValidUserProfile(data, uid) {
+      return data.keys().hasAll([
+          'uid',
+          'preferredLevel',
+          'handsFreeMode',
+          'turnCount',
+          'practicedPhrasesCount',
+          'correctionsCount',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'preferredLevel',
+          'handsFreeMode',
+          'turnCount',
+          'practicedPhrasesCount',
+          'correctionsCount',
+          'completedTopics',
+          'recurringErrors',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == uid
+        && (!('email' in data) || (data.email is string && data.email.size() <= 254))
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
+        && isValidLevel(data.preferredLevel)
+        && data.handsFreeMode is bool
+        && data.turnCount is int && data.turnCount >= 0 && data.turnCount <= 1000000
+        && data.practicedPhrasesCount is int && data.practicedPhrasesCount >= 0 && data.practicedPhrasesCount <= 1000000
+        && data.correctionsCount is int && data.correctionsCount >= 0 && data.correctionsCount <= 1000000
+        && (!('completedTopics' in data) || isValidStringList(data.completedTopics, 30))
+        && (!('recurringErrors' in data) || isValidStringList(data.recurringErrors, 20))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTutorSession(data, uid) {
+      return data.keys().hasAll([
+          'uid',
+          'topic',
+          'characters',
+          'context',
+          'lastInterlocutorSpeaker',
+          'lastInterlocutorPhrase',
+          'lastStudentPhrase',
+          'difficultyLevel',
+          'turnCount',
+          'recentMessages',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'topic',
+          'characters',
+          'context',
+          'lastInterlocutorSpeaker',
+          'lastInterlocutorPhrase',
+          'lastStudentPhrase',
+          'difficultyLevel',
+          'turnCount',
+          'recentMessages',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == uid
+        && data.topic is string && data.topic.size() <= 120
+        && data.characters is string && data.characters.size() <= 200
+        && data.context is string && data.context.size() <= 500
+        && data.lastInterlocutorSpeaker is string && data.lastInterlocutorSpeaker.size() <= 80
+        && data.lastInterlocutorPhrase is string && data.lastInterlocutorPhrase.size() <= 400
+        && data.lastStudentPhrase is string && data.lastStudentPhrase.size() <= 400
+        && isValidLevel(data.difficultyLevel)
+        && data.turnCount is int && data.turnCount >= 0 && data.turnCount <= 1000000
+        && data.recentMessages is list
+        && data.recentMessages.size() <= 30
+        && (data.recentMessages.size() == 0 || data.recentMessages[0] is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSavedItem(data, uid) {
+      return data.keys().hasAll([
+          'uid',
+          'english',
+          'topic',
+          'kind',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'english',
+          'pronunciation',
+          'spanish',
+          'topic',
+          'speakerRole',
+          'errorSummary',
+          'kind',
+          'status',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid == uid
+        && data.english is string && data.english.size() >= 1 && data.english.size() <= 400
+        && (!('pronunciation' in data) || (data.pronunciation is string && data.pronunciation.size() <= 400))
+        && (!('spanish' in data) || (data.spanish is string && data.spanish.size() <= 400))
+        && data.topic is string && data.topic.size() <= 120
+        && (!('speakerRole' in data) || (data.speakerRole is string && data.speakerRole.size() <= 80))
+        && (!('errorSummary' in data) || (data.errorSummary is string && data.errorSummary.size() <= 300))
+        && data.kind in ['phrase', 'error']
+        && data.status in ['pendiente', 'practicado', 'dominado']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow get: if isValidId(uid) && isOwner(uid);
+      allow create: if isValidId(uid)
+        && isOwner(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(uid)
+        && isOwner(uid)
+        && isValidUserProfile(incoming(), uid)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'email',
+          'displayName',
+          'preferredLevel',
+          'handsFreeMode',
+          'turnCount',
+          'practicedPhrasesCount',
+          'correctionsCount',
+          'completedTopics',
+          'recurringErrors',
+          'updatedAt'
+        ]);
+
+      match /sessions/{sessionId} {
+        allow get: if isValidId(uid) && isValidId(sessionId) && isOwner(uid);
+        allow list: if isValidId(uid) && isOwner(uid) && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(uid)
+          && isValidId(sessionId)
+          && isOwner(uid)
+          && isValidTutorSession(incoming(), uid)
+          && exists(/databases/$(database)/documents/users/$(uid))
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(uid)
+          && isValidId(sessionId)
+          && isOwner(uid)
+          && isValidTutorSession(incoming(), uid)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'topic',
+            'characters',
+            'context',
+            'lastInterlocutorSpeaker',
+            'lastInterlocutorPhrase',
+            'lastStudentPhrase',
+            'difficultyLevel',
+            'turnCount',
+            'recentMessages',
+            'updatedAt'
+          ]);
+        allow delete: if isValidId(uid) && isValidId(sessionId) && isOwner(uid);
+      }
+
+      match /savedItems/{itemId} {
+        allow get: if isValidId(uid) && isValidId(itemId) && isOwner(uid);
+        allow list: if isValidId(uid) && isOwner(uid) && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(uid)
+          && isValidId(itemId)
+          && isOwner(uid)
+          && isValidSavedItem(incoming(), uid)
+          && exists(/databases/$(database)/documents/users/$(uid))
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(uid)
+          && isValidId(itemId)
+          && isOwner(uid)
+          && isValidSavedItem(incoming(), uid)
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'pronunciation',
+            'spanish',
+            'status',
+            'errorSummary',
+            'updatedAt'
+          ]);
+        allow delete: if isValidId(uid) && isValidId(itemId) && isOwner(uid);
+      }
+    }
+  }
+}

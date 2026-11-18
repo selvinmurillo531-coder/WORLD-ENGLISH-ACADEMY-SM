@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private student profile, learning preferences, and progress metrics.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "preferredLevel": {
+          "type": "string",
+          "enum": ["Principiante", "Intermedio", "Avanzado"]
+        },
+        "handsFreeMode": { "type": "boolean" },
+        "turnCount": { "type": "integer" },
+        "practicedPhrasesCount": { "type": "integer" },
+        "correctionsCount": { "type": "integer" },
+        "completedTopics": { "type": "array" },
+        "recurringErrors": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "preferredLevel",
+        "handsFreeMode",
+        "turnCount",
+        "practicedPhrasesCount",
+        "correctionsCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TutorSession": {
+      "title": "TutorSession",
+      "description": "Persistent conversational tutoring session state synced across devices.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "topic": { "type": "string", "maxLength": 120 },
+        "characters": { "type": "string", "maxLength": 200 },
+        "context": { "type": "string", "maxLength": 500 },
+        "lastInterlocutorSpeaker": { "type": "string", "maxLength": 80 },
+        "lastInterlocutorPhrase": { "type": "string", "maxLength": 400 },
+        "lastStudentPhrase": { "type": "string", "maxLength": 400 },
+        "difficultyLevel": {
+          "type": "string",
+          "enum": ["Principiante", "Intermedio", "Avanzado"]
+        },
+        "turnCount": { "type": "integer" },
+        "recentMessages": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "topic",
+        "characters",
+        "context",
+        "lastInterlocutorSpeaker",
+        "lastInterlocutorPhrase",
+        "lastStudentPhrase",
+        "difficultyLevel",
+        "turnCount",
+        "recentMessages",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedItem": {
+      "title": "SavedItem",
+      "description": "Saved English phrase or recurring error recorded for conversational review.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "english": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "pronunciation": { "type": "string", "maxLength": 400 },
+        "spanish": { "type": "string", "maxLength": 400 },
+        "topic": { "type": "string", "maxLength": 120 },
+        "speakerRole": { "type": "string", "maxLength": 80 },
+        "errorSummary": { "type": "string", "maxLength": 300 },
+        "kind": { "type": "string", "enum": ["phrase", "error"] },
+        "status": {
+          "type": "string",
+          "enum": ["pendiente", "practicado", "dominado"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "english",
+        "topic",
+        "kind",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private profile and global learning metrics for an authenticated student."
+    },
+    "/users/{uid}/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/TutorSession" },
+      "description": "Active and past tutoring session context and recent messages for cross-device continuity."
+    },
+    "/users/{uid}/savedItems/{itemId}": {
+      "schema": { "$ref": "#/entities/SavedItem" },
+      "description": "Saved phrases and recurring mistakes tracked for conversational practice."
+    }
+  }
+}

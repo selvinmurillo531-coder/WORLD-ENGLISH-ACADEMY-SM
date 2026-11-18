@@ -1,0 +1,6 @@
+{
+  "name": "WORLD ENGLISH ACADEMY SM",
+  "description": "Profesor personal de inglés conversacional estadounidense para hispanohablantes con situaciones reales, audio independiente por frase y corrección guiada.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
